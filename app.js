@@ -1,14 +1,10 @@
 /**
- * SISTEMA DE GESTÃO TERRITORIAL
- * - Leaflet + Turf.js
- * - Armazenamento local (localStorage)
- * - Filtro por grupo
- * - Integração com Google My Maps
- * - Localização GPS com point-in-polygon
+ * SISTEMA DE GESTÃO TERRITORIAL - VERSÃO ESTÁVEL
+ * com logs e garantia de exibição do painel
  */
 
 // ============================================================
-// 1. DICIONÁRIO DOS 58 MIDs (Google My Maps)
+// 1. DICIONÁRIO DOS MIDs
 // ============================================================
 const MAPS_MID_DICT = {
   "jrdTer01": "143nsIAW7T0eb1rwMMv3T1YPxIMU86tg",
@@ -72,10 +68,9 @@ const MAPS_MID_DICT = {
 };
 
 // ============================================================
-// 2. INICIALIZAÇÃO DO MAPA (camada de satélite)
+// 2. INICIALIZAÇÃO DO MAPA
 // ============================================================
 const map = L.map('map').setView([-4.236661, -56.006867], 14);
-
 L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
   maxZoom: 20,
   attribution: 'Google'
@@ -84,84 +79,133 @@ L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
 // ============================================================
 // 3. ESTADO GLOBAL
 // ============================================================
-let geojsonLayer = null;        // camada GeoJSON
-let territorioAtivo = null;     // { info, layer }
-let camadaDestacada = null;     // referência à camada destacada
-let dadosTerritorios = [];      // array com todos os registros
-let todosGrupos = new Set();    // para popular o filtro
-let marcadorUsuario = null;     // marcador de posição GPS
-let circuloPrecisao = null;     // círculo de precisão
+let geojsonLayer = null;
+let territorioAtivo = null;
+let camadaDestacada = null;
+let dadosTerritorios = [];
+let todosGrupos = new Set();
+let marcadorUsuario = null;
+let circuloPrecisao = null;
 
 // ============================================================
-// 4. CARREGAMENTO INICIAL DOS DADOS (localStorage + dados.json)
+// 4. CARREGAR DADOS INICIAIS (localStorage ou dados.json)
 // ============================================================
 async function carregarDadosIniciais() {
-  // Tenta ler do localStorage
   const local = localStorage.getItem('banco_territorios');
   if (local) {
     dadosTerritorios = JSON.parse(local);
     return;
   }
-
-  // Se não houver, carrega do dados.json
   try {
     const resp = await fetch('dados.json');
-    if (!resp.ok) throw new Error('Arquivo dados.json não encontrado.');
-    const dados = await resp.json();
-    dadosTerritorios = dados;
+    if (!resp.ok) throw new Error('dados.json não encontrado');
+    dadosTerritorios = await resp.json();
     localStorage.setItem('banco_territorios', JSON.stringify(dadosTerritorios));
   } catch (err) {
-    console.warn('Não foi possível carregar dados.json. Inicializando vazio.');
+    console.warn('Erro ao carregar dados.json, iniciando vazio.', err);
     dadosTerritorios = [];
   }
 }
 
 // ============================================================
-// 5. FUNÇÃO DE ESTILO DOS POLÍGONOS (baseada no status)
+// 5. ESTILO DOS POLÍGONOS
 // ============================================================
 function obterEstiloPoligono(codigo) {
   const item = dadosTerritorios.find(t => t.codigo === codigo);
   const status = item ? item.status : 'Livre';
-
   if (status === 'Iniciado') {
-    return {
-      color: '#F4B400',
-      weight: 2,
-      fillColor: '#F4B400',
-      fillOpacity: 0.45
-    };
+    return { color: '#F4B400', weight: 2, fillColor: '#F4B400', fillOpacity: 0.45 };
   } else if (status === 'Concluído') {
-    return {
-      color: '#007bff',
-      weight: 2,
-      fillColor: '#007bff',
-      fillOpacity: 0.45
-    };
+    return { color: '#007bff', weight: 2, fillColor: '#007bff', fillOpacity: 0.45 };
   }
-  // Livre (ou padrão)
-  return {
-    color: '#0F9D58',
-    weight: 2,
-    fillColor: 'transparent',
-    fillOpacity: 0
-  };
+  return { color: '#0F9D58', weight: 2, fillColor: 'transparent', fillOpacity: 0 };
 }
 
 // ============================================================
-// 6. CARREGAR GEOJSON E RENDERIZAR
+// 6. FUNÇÃO PARA ABRIR O PAINEL (com logs)
+// ============================================================
+function abrirPainel(codigo, layer) {
+  console.log('🔵 abrirPainel chamado para:', codigo);
+  const item = dadosTerritorios.find(t => t.codigo === codigo);
+  if (!item) {
+    console.warn('⚠️ Território não encontrado no banco:', codigo);
+    return;
+  }
+
+  // Remove destaque anterior
+  if (camadaDestacada && geojsonLayer) {
+    geojsonLayer.resetStyle(camadaDestacada);
+  }
+
+  territorioAtivo = { info: item, layer: layer };
+  camadaDestacada = layer;
+
+  // Destaque
+  layer.setStyle({
+    weight: 4,
+    color: '#FFFFFF',
+    fillOpacity: item.status === 'Livre' ? 0.2 : 0.7
+  });
+  layer.bringToFront();
+  map.fitBounds(layer.getBounds(), { padding: [50, 50], maxZoom: 17 });
+
+  // Preenche os campos do painel
+  const elCodigo = document.getElementById('detalhe-codigo');
+  const elNumero = document.getElementById('detalhe-numero');
+  const elGrupo = document.getElementById('detalhe-grupo');
+  const elStatus = document.getElementById('detalhe-status');
+  const elResponsavel = document.getElementById('detalhe-responsavel');
+  const elInicio = document.getElementById('detalhe-inicio');
+  const elConclusao = document.getElementById('detalhe-conclusao');
+
+  if (elCodigo) elCodigo.innerText = item.codigo;
+  if (elNumero) elNumero.innerText = item.numero || '---';
+  if (elGrupo) {
+    elGrupo.innerText = item.grupo || 'Sem Grupo';
+    elGrupo.style.color = item.corGrupo || '#888';
+  }
+  if (elStatus) elStatus.innerText = item.status;
+  if (elResponsavel) elResponsavel.innerText = item.responsavel || 'Ninguém';
+  if (elInicio) elInicio.innerText = item.dataInicio ? formatarData(item.dataInicio) : '---';
+  if (elConclusao) elConclusao.innerText = item.dataConclusao ? formatarData(item.dataConclusao) : '---';
+
+  // EXIBE O PAINEL
+  const painel = document.getElementById('painel-detalhes');
+  if (painel) {
+    painel.classList.remove('oculto');
+    console.log('✅ Painel exibido com sucesso.');
+  } else {
+    console.error('❌ Elemento #painel-detalhes não encontrado no DOM.');
+  }
+}
+
+// ============================================================
+// 7. FECHAR PAINEL
+// ============================================================
+function fecharPainel() {
+  const painel = document.getElementById('painel-detalhes');
+  if (painel) painel.classList.add('oculto');
+  if (camadaDestacada && geojsonLayer) {
+    geojsonLayer.resetStyle(camadaDestacada);
+    camadaDestacada = null;
+  }
+  territorioAtivo = null;
+}
+
+// ============================================================
+// 8. CARREGAR GEOJSON
 // ============================================================
 async function carregarGeoJSON() {
   try {
     const resp = await fetch('territorios.geojson');
-    if (!resp.ok) throw new Error('territorios.geojson não encontrado.');
+    if (!resp.ok) throw new Error('territorios.geojson não encontrado');
     const geojson = await resp.json();
 
-    // Garantir que todos os territórios tenham entrada no banco
+    // Sincroniza banco
     const codigosExistentes = new Set(dadosTerritorios.map(d => d.codigo));
     geojson.features.forEach(feat => {
       const nome = feat.properties.name;
       if (nome && !codigosExistentes.has(nome)) {
-        // Cria registro padrão
         dadosTerritorios.push({
           codigo: nome,
           numero: nome.replace('jrdTer', ''),
@@ -177,15 +221,13 @@ async function carregarGeoJSON() {
     });
     localStorage.setItem('banco_territorios', JSON.stringify(dadosTerritorios));
 
-    // Extrair grupos únicos para o filtro
+    // Extrai grupos para o filtro
     dadosTerritorios.forEach(d => {
-      if (d.grupo && d.grupo !== 'Sem Grupo') {
-        todosGrupos.add(d.grupo);
-      }
+      if (d.grupo && d.grupo !== 'Sem Grupo') todosGrupos.add(d.grupo);
     });
     popularFiltro();
 
-    // Renderizar GeoJSON
+    // Cria camada GeoJSON
     geojsonLayer = L.geoJSON(geojson, {
       style: (feature) => obterEstiloPoligono(feature.properties.name),
       onEachFeature: (feature, layer) => {
@@ -194,22 +236,27 @@ async function carregarGeoJSON() {
           direction: 'center',
           className: 'label-territorio'
         });
-        layer.on('click', () => abrirPainel(feature.properties.name, layer));
+        // Evento de clique
+        layer.on('click', function (e) {
+          console.log('🖱️ Clique no polígono:', feature.properties.name);
+          abrirPainel(feature.properties.name, this);
+        });
       }
     }).addTo(map);
 
     map.fitBounds(geojsonLayer.getBounds(), { padding: [30, 30] });
+    console.log('✅ GeoJSON carregado com sucesso.');
   } catch (err) {
     alert('Erro ao carregar territorios.geojson: ' + err.message);
   }
 }
 
 // ============================================================
-// 7. POPULAR FILTRO DE GRUPOS
+// 9. FILTRO DE GRUPOS
 // ============================================================
 function popularFiltro() {
   const select = document.getElementById('filtro-grupo');
-  // Limpa opções (mantém a primeira)
+  if (!select) return;
   select.innerHTML = '<option value="TODOS">Todos os Territórios</option>';
   const gruposOrdenados = Array.from(todosGrupos).sort();
   gruposOrdenados.forEach(grupo => {
@@ -220,94 +267,34 @@ function popularFiltro() {
   });
 }
 
-// ============================================================
-// 8. FILTRO POR GRUPO
-// ============================================================
 function aplicarFiltro() {
   const grupoSelecionado = document.getElementById('filtro-grupo').value;
   if (!geojsonLayer) return;
-
   geojsonLayer.eachLayer(layer => {
     const codigo = layer.feature.properties.name;
     const registro = dadosTerritorios.find(d => d.codigo === codigo);
     const grupo = registro ? registro.grupo : 'Sem Grupo';
-    if (grupoSelecionado === 'TODOS' || grupo === grupoSelecionado) {
-      layer.setStyle({ opacity: 1, fillOpacity: obterEstiloPoligono(codigo).fillOpacity || 0 });
-      layer.setStyle({ interactive: true });
-    } else {
-      layer.setStyle({ opacity: 0.1, fillOpacity: 0, interactive: false });
-    }
+    const visivel = grupoSelecionado === 'TODOS' || grupo === grupoSelecionado;
+    layer.setStyle({
+      opacity: visivel ? 1 : 0.1,
+      fillOpacity: visivel ? (obterEstiloPoligono(codigo).fillOpacity || 0) : 0,
+      interactive: visivel
+    });
   });
 }
 
 // ============================================================
-// 9. ABRIR PAINEL DE DETALHES
-// ============================================================
-function abrirPainel(codigo, layer) {
-  const item = dadosTerritorios.find(t => t.codigo === codigo);
-  if (!item) return;
-
-  // Limpa destaque anterior
-  if (camadaDestacada && geojsonLayer) {
-    geojsonLayer.resetStyle(camadaDestacada);
-  }
-
-  territorioAtivo = { info: item, layer: layer };
-  camadaDestacada = layer;
-
-  // Destaque com contorno branco
-  layer.setStyle({
-    weight: 4,
-    color: '#FFFFFF',
-    fillOpacity: item.status === 'Livre' ? 0.2 : 0.7
-  });
-  layer.bringToFront();
-
-  // Zoom no polígono
-  map.fitBounds(layer.getBounds(), { padding: [50, 50], maxZoom: 17 });
-
-  // Preenche o painel
-  document.getElementById('detalhe-codigo').innerText = item.codigo;
-  document.getElementById('detalhe-numero').innerText = item.numero || '---';
-  const grupoSpan = document.getElementById('detalhe-grupo');
-  grupoSpan.innerText = item.grupo || 'Sem Grupo';
-  grupoSpan.style.color = item.corGrupo || '#888';
-  document.getElementById('detalhe-status').innerText = item.status;
-  document.getElementById('detalhe-responsavel').innerText = item.responsavel || 'Ninguém';
-  document.getElementById('detalhe-inicio').innerText = item.dataInicio ? formatarData(item.dataInicio) : '---';
-  document.getElementById('detalhe-conclusao').innerText = item.dataConclusao ? formatarData(item.dataConclusao) : '---';
-
-  document.getElementById('painel-detalhes').classList.remove('oculto');
-}
-
-// ============================================================
-// 10. FECHAR PAINEL
-// ============================================================
-function fecharPainel() {
-  document.getElementById('painel-detalhes').classList.add('oculto');
-  if (camadaDestacada && geojsonLayer) {
-    geojsonLayer.resetStyle(camadaDestacada);
-    camadaDestacada = null;
-  }
-  territorioAtivo = null;
-}
-
-// ============================================================
-// 11. ALTERAR STATUS
+// 10. ALTERAR STATUS
 // ============================================================
 function alterarStatus(novoStatus) {
-  if (!territorioAtivo) return;
-
+  if (!territorioAtivo) return alert('Selecione um território primeiro.');
   const info = territorioAtivo.info;
-  const hoje = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const hoje = new Date().toISOString().slice(0, 10);
 
   if (novoStatus === 'Iniciado') {
     const resp = prompt('Nome do responsável:', info.responsavel || '');
-    if (resp !== null) {
-      info.responsavel = resp.trim() || '';
-    } else {
-      return; // cancelou
-    }
+    if (resp === null) return; // cancelou
+    info.responsavel = resp.trim() || '';
     info.dataInicio = hoje;
     info.dataConclusao = '';
   } else if (novoStatus === 'Concluído') {
@@ -318,53 +305,39 @@ function alterarStatus(novoStatus) {
     info.dataInicio = '';
     info.dataConclusao = '';
   }
-
   info.status = novoStatus;
-
-  // Salva no localStorage
   localStorage.setItem('banco_territorios', JSON.stringify(dadosTerritorios));
-
-  // Atualiza estilos de todos os polígonos
   geojsonLayer.setStyle(f => obterEstiloPoligono(f.properties.name));
-
-  // Reabre o painel para refletir as mudanças
   abrirPainel(info.codigo, territorioAtivo.layer);
 }
 
 // ============================================================
-// 12. ABRIR GOOGLE MY MAPS (modo viewer ampliado)
+// 11. ABRIR GOOGLE MAPS
 // ============================================================
 function abrirGoogleMaps() {
   if (!territorioAtivo || !territorioAtivo.layer) {
     alert('Selecione um território primeiro.');
     return;
   }
-
   const codigo = territorioAtivo.info.codigo;
   const mid = MAPS_MID_DICT[codigo];
   if (!mid) {
-    alert(`Link do mapa não cadastrado para o território ${codigo}.`);
+    alert(`Link do mapa não cadastrado para ${codigo}.`);
     return;
   }
-
   const bounds = territorioAtivo.layer.getBounds();
   const centro = bounds.getCenter();
   const lat = centro.lat.toFixed(14);
   const lng = centro.lng.toFixed(14);
-
   const url = `https://www.google.com/maps/d/u/0/viewer?mid=${mid}&ll=${lat}%2C${lng}&z=16`;
   window.open(url, '_blank');
 }
 
 // ============================================================
-// 13. LOCALIZAÇÃO GPS (consulta única)
+// 12. GPS
 // ============================================================
 function ativarGPS() {
-  if (!navigator.geolocation) {
-    alert('GPS não suportado pelo dispositivo.');
-    return;
-  }
-
+  if (!navigator.geolocation) return alert('GPS não suportado.');
   const btn = document.getElementById('btn-gps');
   btn.innerText = '⏳ Buscando...';
   btn.disabled = true;
@@ -373,22 +346,15 @@ function ativarGPS() {
     (pos) => {
       btn.innerText = '📍 Onde Estou?';
       btn.disabled = false;
-
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
-      const precisao = pos.coords.accuracy; // em metros
+      const precisao = pos.coords.accuracy;
 
-      // Adiciona/atualiza marcador e círculo
       if (marcadorUsuario) {
         marcadorUsuario.setLatLng([lat, lng]);
       } else {
         marcadorUsuario = L.marker([lat, lng], {
-          icon: L.divIcon({
-            className: 'gps-marker',
-            html: '📍',
-            iconSize: [24, 24],
-            iconAnchor: [12, 24]
-          })
+          icon: L.divIcon({ className: 'gps-marker', html: '📍', iconSize: [24, 24], iconAnchor: [12, 24] })
         }).addTo(map);
       }
       if (circuloPrecisao) {
@@ -404,7 +370,6 @@ function ativarGPS() {
         }).addTo(map);
       }
 
-      // Point-in-Polygon com Turf
       const ponto = turf.point([lng, lat]);
       let encontrado = false;
       geojsonLayer.eachLayer(layer => {
@@ -413,21 +378,19 @@ function ativarGPS() {
           encontrado = true;
         }
       });
-      if (!encontrado) {
-        alert('Você não está dentro de nenhum território cadastrado.');
-      }
+      if (!encontrado) alert('Você não está dentro de nenhum território.');
     },
     (erro) => {
       btn.innerText = '📍 Onde Estou?';
       btn.disabled = false;
-      alert('Erro ao obter localização: ' + erro.message);
+      alert('Erro GPS: ' + erro.message);
     },
     { enableHighAccuracy: true, timeout: 15000 }
   );
 }
 
 // ============================================================
-// 14. UTILITÁRIOS
+// 13. UTILITÁRIOS
 // ============================================================
 function formatarData(dataISO) {
   if (!dataISO) return '---';
@@ -436,27 +399,27 @@ function formatarData(dataISO) {
 }
 
 // ============================================================
-// 15. INICIALIZAÇÃO
+// 14. INICIALIZAÇÃO (executa ao carregar)
 // ============================================================
 (async function init() {
   await carregarDadosIniciais();
   await carregarGeoJSON();
 
-  // Eventos dos botões
-  document.getElementById('btn-gps').addEventListener('click', ativarGPS);
-  document.getElementById('btn-fechar-painel').addEventListener('click', fecharPainel);
-  document.getElementById('btn-rota').addEventListener('click', abrirGoogleMaps);
-  document.getElementById('btn-iniciar').addEventListener('click', () => alterarStatus('Iniciado'));
-  document.getElementById('btn-concluir').addEventListener('click', () => alterarStatus('Concluído'));
-  document.getElementById('btn-livre').addEventListener('click', () => alterarStatus('Livre'));
+  // Eventos dos botões (usando addEventListener)
+  document.getElementById('btn-gps')?.addEventListener('click', ativarGPS);
+  document.getElementById('btn-fechar-painel')?.addEventListener('click', fecharPainel);
+  document.getElementById('btn-rota')?.addEventListener('click', abrirGoogleMaps);
+  document.getElementById('btn-iniciar')?.addEventListener('click', () => alterarStatus('Iniciado'));
+  document.getElementById('btn-concluir')?.addEventListener('click', () => alterarStatus('Concluído'));
+  document.getElementById('btn-livre')?.addEventListener('click', () => alterarStatus('Livre'));
+  document.getElementById('filtro-grupo')?.addEventListener('change', aplicarFiltro);
 
-  // Filtro
-  document.getElementById('filtro-grupo').addEventListener('change', aplicarFiltro);
-
-  // Fechar painel ao clicar fora (opcional)
+  // Fecha o painel ao clicar no mapa (opcional)
   map.on('click', () => {
-    if (!document.getElementById('painel-detalhes').classList.contains('oculto')) {
+    if (!document.getElementById('painel-detalhes')?.classList.contains('oculto')) {
       fecharPainel();
     }
   });
+
+  console.log('🚀 Sistema inicializado com sucesso!');
 })();
