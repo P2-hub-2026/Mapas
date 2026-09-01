@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Gestão de Territórios</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Barra superior com filtro e botão GPS -->
+  <header id="top-bar">
+    <select id="filtro-grupo">
+      <option value="TODOS">Todos os Territórios</option>
+    </select>
+    <button id="btn-gps">📍 Onde Estou?</button>
+  </header>
+
+  <!-- Contêiner do mapa -->
+  <div id="map"></div>
+
+  <!-- Painel inferior (gaveta) de detalhes -->
+  <div id="painel-detalhes" class="painel oculto">
+    <button class="btn-fechar" id="btn-fechar-painel">✕</button>
+    <h2 id="detalhe-codigo">---</h2>
+    <p><strong>Número:</strong> <span id="detalhe-numero">---</span></p>
+    <p><strong>Grupo:</strong> <span id="detalhe-grupo" style="font-weight:bold;">---</span></p>
+    <p><strong>Situação:</strong> <span id="detalhe-status">---</span></p>
+    <p><strong>Responsável:</strong> <span id="detalhe-responsavel">---</span></p>
+    <p><strong>Início:</strong> <span id="detalhe-inicio">---</span></p>
+    <p><strong>Conclusão:</strong> <span id="detalhe-conclusao">---</span></p>
+    <hr />
+    <div class="painel-acoes">
+      <button id="btn-rota">🗺️ Abrir Maps</button>
+      <button id="btn-iniciar">Iniciar</button>
+      <button id="btn-concluir">Concluir</button>
+      <button id="btn-livre">Liberar</button>
+    </div>
+  </div>
+
+  <!-- Bibliotecas JavaScript -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
