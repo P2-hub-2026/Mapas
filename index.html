@@ -1,46 +1,78 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Gestão de Territórios</title>
-  <!-- Leaflet CSS -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gestão Territorial - Multi-Congregação</title>
+  
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- Barra superior com filtro e botão GPS -->
+  <!-- Barra de Filtros -->
   <header id="top-bar">
-    <select id="filtro-grupo">
-      <option value="TODOS">Todos os Territórios</option>
+    <select id="filtro-congregacao" onchange="renderizarMapa()">
+      <option value="Jardim">Congregação Jardim</option>
+      <option value="Central">Congregação Central</option>
+      <option value="Alvorada">Congregação Alvorada</option>
     </select>
-    <button id="btn-gps">📍 Onde Estou?</button>
+
+    <select id="filtro-status" onchange="renderizarMapa()">
+      <option value="TODOS">Todos os Status</option>
+      <option value="Livre">Livres</option>
+      <option value="Designado">Designados</option>
+      <option value="Trabalhando">Trabalhando</option>
+      <option value="Concluído">Concluídos</option>
+    </select>
+
+    <button id="btn-gps" onclick="ativarGPS()">📍 GPS</button>
   </header>
 
-  <!-- Contêiner do mapa -->
+  <!-- Container do Mapa -->
   <div id="map"></div>
 
-  <!-- Painel inferior (gaveta) de detalhes -->
+  <!-- Ficha do Território (Estilo Hourglass) -->
   <div id="painel-detalhes" class="painel oculto">
-    <button class="btn-fechar" id="btn-fechar-painel">✕</button>
-    <h2 id="detalhe-codigo">---</h2>
-    <p><strong>Número:</strong> <span id="detalhe-numero">---</span></p>
-    <p><strong>Grupo:</strong> <span id="detalhe-grupo" style="font-weight:bold;">---</span></p>
-    <p><strong>Situação:</strong> <span id="detalhe-status">---</span></p>
-    <p><strong>Responsável:</strong> <span id="detalhe-responsavel">---</span></p>
-    <p><strong>Início:</strong> <span id="detalhe-inicio">---</span></p>
-    <p><strong>Conclusão:</strong> <span id="detalhe-conclusao">---</span></p>
-    <hr />
+    <button class="btn-fechar" onclick="fecharPainel()">✕</button>
+    
+    <div class="painel-cabecalho">
+      <h2 id="detalhe-codigo">---</h2>
+      <span id="detalhe-tag-status" class="badge">---</span>
+    </div>
+
+    <div class="info-grid">
+      <p><strong>Congregação:</strong> <span id="detalhe-congregacao">---</span></p>
+      <p><strong>Designado a:</strong> <span id="detalhe-publicador">Ninguém</span></p>
+      <p><strong>Data de Saída:</strong> <span id="detalhe-saida">--/--/----</span></p>
+      <p><strong>Última Conclusão:</strong> <span id="detalhe-conclusao">--/--/----</span></p>
+      <p><strong>Pontos Registrados:</strong> <span id="detalhe-qtd-pontos">0</span></p>
+    </div>
+    
+    <hr>
+    
+    <!-- Controles de Status -->
     <div class="painel-acoes">
-      <button id="btn-rota">🗺️ Abrir Maps</button>
-      <button id="btn-iniciar">Iniciar</button>
-      <button id="btn-concluir">Concluir</button>
-      <button id="btn-livre">Liberar</button>
+      <button id="btn-designar" onclick="acaoDesignar()">📋 Designar</button>
+      <button id="btn-trabalhar" onclick="alterarStatus('Trabalhando')">🚶 Em Campo</button>
+      <button id="btn-concluir" onclick="alterarStatus('Concluído')">✅ Concluir</button>
+      <button id="btn-liberar" onclick="alterarStatus('Livre')">🔄 Liberar</button>
+    </div>
+
+    <!-- Navegação e Marcações -->
+    <div class="painel-acoes-secundarias">
+      <button id="btn-maps" onclick="abrirNoGoogleMaps()">🗺️ Ver no Maps</button>
+      <button id="btn-rota" onclick="tracarRotaAteTerritorio()">🚗 Rota até Território</button>
+      <button id="btn-add-ponto" onclick="alternarModoMarcacao()">📍 Marcar Ponto</button>
+    </div>
+
+    <!-- Lista de Endereços/Notas -->
+    <div id="secao-pontos" class="secao-pontos">
+      <h4>Pontos & Notas do Território</h4>
+      <ul id="lista-pontos"></ul>
     </div>
   </div>
 
-  <!-- Bibliotecas JavaScript -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
   <script src="app.js"></script>
