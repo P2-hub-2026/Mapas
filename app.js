@@ -57,7 +57,7 @@ fetch('territorios.geojson')
       const nome = feat.properties.name;
       if (nome && !codigosExistentes.has(nome)) {
         // Lógica de distribuição provisória para visualização multi-congregação
-        let cong = "Jardim";
+        let cong = "jardins";
         const num = parseInt(nome.replace(/\D/g, ''), 10) || 0;
         if (num > 20 && num <= 40) cong = "Central";
         else if (num > 40) cong = "Alvorada";
